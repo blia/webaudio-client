@@ -124,7 +124,7 @@ navigator.getUserMedia = (navigator.getUserMedia ||
                           navigator.mozGetUserMedia ||
                           navigator.msGetUserMedia);
 function MicrophoneSample() {
-  this.socket = new WebSocket('wss://0.0.0.0:1488');
+  this.socket = ws;
   this.WIDTH = 640;
   this.HEIGHT = 480;
   this.getMicrophoneInput();
@@ -186,6 +186,19 @@ MicrophoneSample.prototype.visualize = function() {
   requestAnimFrame(this.visualize.bind(this));
 };
 
+const wsButton = document.querySelector('#wsButton');
+const micButton = document.querySelector('#micButton');
 
+let ws;
 
-var sample = new MicrophoneSample();
+wsButton.onclick = () => {
+  if (ws) {
+    ws.onerror = ws.onopen = ws.onclose = null;
+    ws.close();
+  }
+  ws = new WebSocket(`ws://${location.host}`);
+}
+
+micButton.onclick = () => {
+  var sample = new MicrophoneSample();
+}
