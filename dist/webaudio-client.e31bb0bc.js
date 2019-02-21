@@ -104,74 +104,172 @@ parcelRequire = (function (modules, cache, entry, globalName) {
 
   // Override the current require with this new one
   return newRequire;
-})({"../../../usr/lib/node_modules/parcel-bundler/src/builtins/bundle-url.js":[function(require,module,exports) {
-var bundleURL = null;
+})({"index.js":[function(require,module,exports) {
+/*
+ * Copyright 2013 Boris Smus. All Rights Reserved.
 
-function getBundleURLCached() {
-  if (!bundleURL) {
-    bundleURL = getBundleURL();
-  }
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+// Start off by initializing a new context.
+context = new (window.AudioContext || window.webkitAudioContext)();
+if (!context.createGain) context.createGain = context.createGainNode;
+if (!context.createDelay) context.createDelay = context.createDelayNode;
+if (!context.createScriptProcessor) context.createScriptProcessor = context.createJavaScriptNode; // shim layer with setTimeout fallback
 
-  return bundleURL;
+window.requestAnimFrame = function () {
+  return window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame || window.oRequestAnimationFrame || window.msRequestAnimationFrame || function (callback) {
+    window.setTimeout(callback, 1000 / 60);
+  };
+}();
+
+function playSound(buffer, time) {
+  var source = context.createBufferSource();
+  source.buffer = buffer;
+  source.connect(context.destination);
+  source[source.start ? 'start' : 'noteOn'](time);
 }
 
-function getBundleURL() {
-  // Attempt to find the URL of the current script and use that as the base URL
-  try {
-    throw new Error();
-  } catch (err) {
-    var matches = ('' + err.stack).match(/(https?|file|ftp):\/\/[^)\n]+/g);
+function loadSounds(obj, soundMap, callback) {
+  // Array-ify
+  var names = [];
+  var paths = [];
 
-    if (matches) {
-      return getBaseURL(matches[0]);
+  for (var name in soundMap) {
+    var path = soundMap[name];
+    names.push(name);
+    paths.push(path);
+  }
+
+  bufferLoader = new BufferLoader(context, paths, function (bufferList) {
+    for (var i = 0; i < bufferList.length; i++) {
+      var buffer = bufferList[i];
+      var name = names[i];
+      obj[name] = buffer;
     }
-  }
 
-  return '/';
+    if (callback) {
+      callback();
+    }
+  });
+  bufferLoader.load();
 }
 
-function getBaseURL(url) {
-  return ('' + url).replace(/^((?:https?|file|ftp):\/\/.+)\/[^/]+$/, '$1') + '/';
+function BufferLoader(context, urlList, callback) {
+  this.context = context;
+  this.urlList = urlList;
+  this.onload = callback;
+  this.bufferList = new Array();
+  this.loadCount = 0;
 }
 
-exports.getBundleURL = getBundleURLCached;
-exports.getBaseURL = getBaseURL;
-},{}],"../../../usr/lib/node_modules/parcel-bundler/src/builtins/css-loader.js":[function(require,module,exports) {
-var bundle = require('./bundle-url');
+BufferLoader.prototype.loadBuffer = function (url, index) {
+  // Load buffer asynchronously
+  var request = new XMLHttpRequest();
+  request.open("GET", url, true);
+  request.responseType = "arraybuffer";
+  var loader = this;
 
-function updateLink(link) {
-  var newLink = link.cloneNode();
+  request.onload = function () {
+    // Asynchronously decode the audio file data in request.response
+    loader.context.decodeAudioData(request.response, function (buffer) {
+      if (!buffer) {
+        alert('error decoding file data: ' + url);
+        return;
+      }
 
-  newLink.onload = function () {
-    link.remove();
+      loader.bufferList[index] = buffer;
+      if (++loader.loadCount == loader.urlList.length) loader.onload(loader.bufferList);
+    }, function (error) {
+      console.error('decodeAudioData error', error);
+    });
   };
 
-  newLink.href = link.href.split('?')[0] + '?' + Date.now();
-  link.parentNode.insertBefore(newLink, link.nextSibling);
+  request.onerror = function () {
+    alert('BufferLoader: XHR error');
+  };
+
+  request.send();
+};
+
+BufferLoader.prototype.load = function () {
+  for (var i = 0; i < this.urlList.length; ++i) this.loadBuffer(this.urlList[i], i);
+};
+
+navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
+
+function MicrophoneSample() {
+  this.socket = new WebSocket('wss://0.0.0.0:1488');
+  this.WIDTH = 640;
+  this.HEIGHT = 480;
+  this.getMicrophoneInput();
+  this.canvas = document.querySelector('canvas');
 }
 
-var cssTimeout = null;
+MicrophoneSample.prototype.getMicrophoneInput = function () {
+  // TODO(smus): Remove this ugliness.
+  var isLocalhost = window.location.hostname == 'localhost' || window.location.hostname == '127.0.0.1';
 
-function reloadCSS() {
-  if (cssTimeout) {
-    return;
+  if (window.location.protocol != 'https:' && !isLocalhost) {
+    alert('HTTPS is required for microphone access, and this site has no SSL cert yet. Sorry!');
   }
 
-  cssTimeout = setTimeout(function () {
-    var links = document.querySelectorAll('link[rel="stylesheet"]');
+  navigator.getUserMedia({
+    audio: true
+  }, this.onStream.bind(this), this.onStreamError.bind(this));
+};
 
-    for (var i = 0; i < links.length; i++) {
-      if (bundle.getBaseURL(links[i].href) === bundle.getBundleURL()) {
-        updateLink(links[i]);
-      }
-    }
+MicrophoneSample.prototype.onStream = function (stream) {
+  var input = context.createMediaStreamSource(stream);
+  var filter = context.createBiquadFilter();
+  filter.frequency.value = 60.0;
+  filter.type = filter.NOTCH;
+  filter.Q = 10.0;
+  var analyser = context.createAnalyser(); // Connect graph.
 
-    cssTimeout = null;
-  }, 50);
-}
+  input.connect(filter);
+  filter.connect(analyser);
+  this.analyser = analyser; // Setup a timer to visualize some stuff.
 
-module.exports = reloadCSS;
-},{"./bundle-url":"../../../usr/lib/node_modules/parcel-bundler/src/builtins/bundle-url.js"}],"../../../usr/lib/node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
+  requestAnimFrame(this.visualize.bind(this));
+};
+
+MicrophoneSample.prototype.onStreamError = function (e) {
+  console.error('Error getting microphone', e);
+};
+
+MicrophoneSample.prototype.visualize = function () {
+  this.canvas.width = this.WIDTH;
+  this.canvas.height = this.HEIGHT;
+  var drawContext = this.canvas.getContext('2d');
+  var times = new Uint8Array(this.analyser.frequencyBinCount);
+  this.analyser.getByteTimeDomainData(times);
+  this.socket.send(128 - times.reduce((acc, v) => acc > v ? v : acc, 255)); // console.log(times);
+
+  for (var i = 0; i < times.length; i++) {
+    var value = times[i];
+    var percent = value / 256;
+    var height = this.HEIGHT * percent;
+    var offset = this.HEIGHT - height - 1;
+    var barWidth = this.WIDTH / times.length;
+    drawContext.fillStyle = 'black';
+    drawContext.fillRect(i * barWidth, offset, 1, 1);
+  }
+
+  requestAnimFrame(this.visualize.bind(this));
+};
+
+var sample = new MicrophoneSample();
+},{}],"../../../usr/lib/node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
 var OldModule = module.bundle.Module;
@@ -340,4 +438,5 @@ function hmrAccept(bundle, id) {
     return hmrAccept(global.parcelRequire, id);
   });
 }
-},{}]},{},["../../../usr/lib/node_modules/parcel-bundler/src/builtins/hmr-runtime.js"], null)
+},{}]},{},["../../../usr/lib/node_modules/parcel-bundler/src/builtins/hmr-runtime.js","index.js"], null)
+//# sourceMappingURL=/webaudio-client.e31bb0bc.map
