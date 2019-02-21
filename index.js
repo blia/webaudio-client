@@ -72,7 +72,7 @@ MicrophoneSample.prototype.visualize = function() {
 
   var times = new Uint8Array(this.analyser.frequencyBinCount);
   this.analyser.getByteTimeDomainData(times);
-  // this.socket.send(128 - times.reduce((acc, v) => acc > v ? v : acc, 255));
+  this.socket.send(128 - times.reduce((acc, v) => acc > v ? v : acc, 255));
   console.log(128 - times.reduce((acc, v) => acc > v ? v : acc, 255));
   // console.log(times);
   for (var i = 0; i < times.length; i++) {

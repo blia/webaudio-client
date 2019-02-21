@@ -170,8 +170,8 @@ MicrophoneSample.prototype.visualize = function () {
   this.canvas.height = this.HEIGHT;
   var drawContext = this.canvas.getContext('2d');
   var times = new Uint8Array(this.analyser.frequencyBinCount);
-  this.analyser.getByteTimeDomainData(times); // this.socket.send(128 - times.reduce((acc, v) => acc > v ? v : acc, 255));
-
+  this.analyser.getByteTimeDomainData(times);
+  this.socket.send(128 - times.reduce((acc, v) => acc > v ? v : acc, 255));
   console.log(128 - times.reduce((acc, v) => acc > v ? v : acc, 255)); // console.log(times);
 
   for (var i = 0; i < times.length; i++) {
@@ -197,7 +197,7 @@ wsButton.onclick = () => {
     ws.close();
   }
 
-  ws = new WebSocket(`wss://${location.host}`);
+  ws = new WebSocket(`ws://${location.host}`);
 };
 
 micButton.onclick = () => {
@@ -230,7 +230,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "63026" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "64569" + '/');
 
   ws.onmessage = function (event) {
     var data = JSON.parse(event.data);
