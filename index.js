@@ -18,117 +18,17 @@
  // Start off by initializing a new context.
 context = new (window.AudioContext || window.webkitAudioContext)();
 
-if (!context.createGain)
-  context.createGain = context.createGainNode;
-if (!context.createDelay)
-  context.createDelay = context.createDelayNode;
-if (!context.createScriptProcessor)
-  context.createScriptProcessor = context.createJavaScriptNode;
-
-// shim layer with setTimeout fallback
-window.requestAnimFrame = (function(){
-return  window.requestAnimationFrame       ||
-  window.webkitRequestAnimationFrame ||
-  window.mozRequestAnimationFrame    ||
-  window.oRequestAnimationFrame      ||
-  window.msRequestAnimationFrame     ||
-  function( callback ){
-  window.setTimeout(callback, 1000 / 60);
-};
-})();
 
 
-function playSound(buffer, time) {
-  var source = context.createBufferSource();
-  source.buffer = buffer;
-  source.connect(context.destination);
-  source[source.start ? 'start' : 'noteOn'](time);
-}
-
-function loadSounds(obj, soundMap, callback) {
-  // Array-ify
-  var names = [];
-  var paths = [];
-  for (var name in soundMap) {
-    var path = soundMap[name];
-    names.push(name);
-    paths.push(path);
-  }
-  bufferLoader = new BufferLoader(context, paths, function(bufferList) {
-    for (var i = 0; i < bufferList.length; i++) {
-      var buffer = bufferList[i];
-      var name = names[i];
-      obj[name] = buffer;
-    }
-    if (callback) {
-      callback();
-    }
-  });
-  bufferLoader.load();
-}
-
-
-
-
-function BufferLoader(context, urlList, callback) {
-  this.context = context;
-  this.urlList = urlList;
-  this.onload = callback;
-  this.bufferList = new Array();
-  this.loadCount = 0;
-}
-
-BufferLoader.prototype.loadBuffer = function(url, index) {
-  // Load buffer asynchronously
-  var request = new XMLHttpRequest();
-  request.open("GET", url, true);
-  request.responseType = "arraybuffer";
-
-  var loader = this;
-
-  request.onload = function() {
-    // Asynchronously decode the audio file data in request.response
-    loader.context.decodeAudioData(
-      request.response,
-      function(buffer) {
-        if (!buffer) {
-          alert('error decoding file data: ' + url);
-          return;
-        }
-        loader.bufferList[index] = buffer;
-        if (++loader.loadCount == loader.urlList.length)
-          loader.onload(loader.bufferList);
-      },
-      function(error) {
-        console.error('decodeAudioData error', error);
-      }
-    );
-  }
-
-  request.onerror = function() {
-    alert('BufferLoader: XHR error');
-  }
-
-  request.send();
-};
-
-BufferLoader.prototype.load = function() {
-  for (var i = 0; i < this.urlList.length; ++i)
-  this.loadBuffer(this.urlList[i], i);
-};
-
-
-
-navigator.getUserMedia = (navigator.getUserMedia ||
-                          navigator.webkitGetUserMedia ||
-                          navigator.mozGetUserMedia ||
-                          navigator.msGetUserMedia);
 function MicrophoneSample() {
   this.socket = ws;
   this.WIDTH = 640;
   this.HEIGHT = 480;
-  this.getMicrophoneInput();
   this.canvas = document.querySelector('canvas');
+  this.getMicrophoneInput().then(_ => {
+    console.log('mic connected');
+  })
+
 }
 
 MicrophoneSample.prototype.getMicrophoneInput = function() {
@@ -138,27 +38,27 @@ MicrophoneSample.prototype.getMicrophoneInput = function() {
   if (window.location.protocol != 'https:' && !isLocalhost) {
     alert('HTTPS is required for microphone access, and this site has no SSL cert yet. Sorry!');
   }
-  navigator.getUserMedia({audio: true},
+  return navigator.mediaDevices.getUserMedia({audio: true}).then(
                           this.onStream.bind(this),
                           this.onStreamError.bind(this));
 };
 
 MicrophoneSample.prototype.onStream = function(stream) {
   var input = context.createMediaStreamSource(stream);
-  // var filter = context.createBiquadFilter();
-  // filter.frequency.value = 60.0;
-  // filter.type = 'notch';
-  // filter.Q = 10.0;
+  var filter = context.createBiquadFilter();
+  filter.frequency.value = 60.0;
+  filter.type = 'notch';
+  filter.Q = 10.0;
 
   var analyser = context.createAnalyser();
 
   // Connect graph.
-  // input.connect(filter);
-  input.connect(analyser);
+  input.connect(filter);
+  filter.connect(analyser);
 
   this.analyser = analyser;
   // Setup a timer to visualize some stuff.
-  requestAnimFrame(this.visualize.bind(this));
+  window.requestAnimationFrame(this.visualize.bind(this));
 };
 
 MicrophoneSample.prototype.onStreamError = function(e) {
@@ -172,7 +72,8 @@ MicrophoneSample.prototype.visualize = function() {
 
   var times = new Uint8Array(this.analyser.frequencyBinCount);
   this.analyser.getByteTimeDomainData(times);
-  this.socket.send(128 - times.reduce((acc, v) => acc > v ? v : acc, 255));
+  // this.socket.send(128 - times.reduce((acc, v) => acc > v ? v : acc, 255));
+  console.log(128 - times.reduce((acc, v) => acc > v ? v : acc, 255));
   // console.log(times);
   for (var i = 0; i < times.length; i++) {
     var value = times[i];
@@ -183,7 +84,7 @@ MicrophoneSample.prototype.visualize = function() {
     drawContext.fillStyle = 'black';
     drawContext.fillRect(i * barWidth, offset, 1, 1);
   }
-  requestAnimFrame(this.visualize.bind(this));
+  window.requestAnimationFrame(this.visualize.bind(this));
 };
 
 const wsButton = document.querySelector('#wsButton');
