@@ -15,5 +15,8 @@
   "dependencies": {
     "tone": "^13.4.9",
     "ws": "^6.1.4"
+  },
+  "devDependencies": {
+    "cssnano": "^4.1.10"
   }
 }
