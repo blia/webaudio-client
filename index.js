@@ -124,7 +124,7 @@ navigator.getUserMedia = (navigator.getUserMedia ||
                           navigator.mozGetUserMedia ||
                           navigator.msGetUserMedia);
 function MicrophoneSample() {
-  this.socket = new WebSocket('ws://localhost:1488');
+  this.socket = new WebSocket('ws://0.0.0.0:1488');
   this.WIDTH = 640;
   this.HEIGHT = 480;
   this.getMicrophoneInput();
