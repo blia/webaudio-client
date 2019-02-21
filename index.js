@@ -145,16 +145,16 @@ MicrophoneSample.prototype.getMicrophoneInput = function() {
 
 MicrophoneSample.prototype.onStream = function(stream) {
   var input = context.createMediaStreamSource(stream);
-  var filter = context.createBiquadFilter();
-  filter.frequency.value = 60.0;
-  filter.type = 'notch';
-  filter.Q = 10.0;
+  // var filter = context.createBiquadFilter();
+  // filter.frequency.value = 60.0;
+  // filter.type = 'notch';
+  // filter.Q = 10.0;
 
   var analyser = context.createAnalyser();
 
   // Connect graph.
-  input.connect(filter);
-  filter.connect(analyser);
+  // input.connect(filter);
+  input.connect(analyser);
 
   this.analyser = analyser;
   // Setup a timer to visualize some stuff.
