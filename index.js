@@ -196,7 +196,7 @@ wsButton.onclick = () => {
     ws.onerror = ws.onopen = ws.onclose = null;
     ws.close();
   }
-  ws = new WebSocket(`ws://${location.host}`);
+  ws = new WebSocket(`wss://${location.host}`);
 }
 
 micButton.onclick = () => {
